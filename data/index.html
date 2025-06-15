@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My sunshine</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            background-color: #FFFBF0; /* Warm sunshine-like background */
+        }
+        h1 {
+            color: #FFB400; /* Sun-inspired color */
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Soft shadow for emphasis */
+        }
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.2rem;
+            background-color: #FFD700; /* Bright golden yellow */
+            color: #333;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        button:hover {
+            background-color: #FFC107; /* Slightly darker for hover effect */
+            transform: translateY(-2px); /* Lift on hover */
+        }
+        button:active {
+            background-color: #FFB400; /* Darker pressed state */
+            transform: translateY(0); /* Reset lift */
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 1.5rem;
+            color: #333;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>My sunshine</h1>
+    <button onclick="turnOnLED()">Turn on LED</button>
+    <button onclick="turnOffLED()">Turn off LED</button>
+    <p id="status">Status: Unknown</p>
+
+    <script>
+        async function turnOnLED() {
+            const response = await fetch('/on');
+            const text = await response.text();
+            document.getElementById('status').textContent = `Status: ${text}`;
+        }
+
+        async function turnOffLED() {
+            const response = await fetch('/off');
+            const text = await response.text();
+            document.getElementById('status').textContent = `Status: ${text}`;
+        }
+    </script>
+</body>
+</html>
