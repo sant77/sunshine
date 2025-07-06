@@ -16,6 +16,10 @@ Además, permite enviar y recibir mensajes MQTT y ofrece un **modo offline** con
 
 ## 🚀 Funcionamiento
 
+### Diagrama de flujo
+
+![Alt text](docs/Inteligent lamp.jpg)
+
 ### Inicio normal
 
 1. Al encender, el ESP32 intenta conectarse al WiFi (timeout: 5 segundos).
