@@ -145,7 +145,7 @@ void handleMQTTMessages() {
 // SETUP
 // =========================
 void setup() {
-    wifiManager.resetSettings();
+    //wifiManager.resetSettings();
     Serial.begin(115200);
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, ledState);
