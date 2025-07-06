@@ -1,61 +1,69 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiManager.h>
+#include <WiFiManager.h> // Para configuración WiFi dinámica
 #include <PubSubClient.h>
-#include "secrets.h"
+#include "secrets.h"     // Aquí defines MQTT_SERVER y MQTT_USER, etc.
 
-
-// Añade estas líneas al principio, después de los includes pero antes de cualquier función
+// Declaraciones anticipadas
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void reconnectMQTT();
 
-// MQTT Configuration
+// Configuración MQTT
 const char* mqttServer = MQTT_SERVER;
 const int mqttPort = 1883;
 const char* mqttTopicPublish = "esp32/home/lamp/santi";
 const char* mqttTopicSubscribe = "esp32/home/lamp/dani";
 const char* mqttUser = MQTT_USER;
 
-// Hardware Configuration
+// Pines
 const int ledPin = 18;
 const int touchPin = 32;
-const int touchThreshold = 40;
+const int touchThreshold = 40; // Umbral para detectar touch
 
-// State Variables
+// Estados
 bool ledState = false;
 bool isOfflineMode = false;
 bool isTouching = false;
 bool longPressDetected = false;
-bool messsage_from_other = false;
+bool messageFromOther = false;
 unsigned long touchStartTime = 0;
 unsigned long previousMillis = 0;
-const long interval = 3000;      // MQTT toggle interval
+const long interval = 3000; // Intervalo para togglear LED por MQTT
 
-// Network Clients
+// Clientes
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
+// =========================
+// FUNCIONES AUXILIARES
+// =========================
 
+// Alternar LED localmente
 void toggleLED() {
     ledState = !ledState;
     digitalWrite(ledPin, ledState);
     Serial.println(ledState ? "LED Encendido" : "LED Apagado");
 }
 
+// Configurar y conectar WiFi con WiFiManager (si falla, modo offline)
 void setupWiFi() {
     WiFiManager wifiManager;
-    wifiManager.setConfigPortalTimeout(180);
+    wifiManager.setConfigPortalTimeout(180); // Portal dura 3 min
+
     if (!wifiManager.autoConnect("ESP32_AP")) {
         Serial.println("WiFi no conectado. Activando modo offline...");
+        isOfflineMode = true;
     }
 }
 
+// Configurar MQTT
 void setupMQTT() {
     mqttClient.setServer(mqttServer, mqttPort);
     mqttClient.setCallback(mqttCallback);
     reconnectMQTT();
 }
 
+// Reconectar MQTT
 void reconnectMQTT() {
     int attempts = 0;
     while (!mqttClient.connected() && attempts < 7) {
@@ -73,6 +81,7 @@ void reconnectMQTT() {
     }
 }
 
+// Callback al recibir mensajes MQTT
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
     String message;
     for (unsigned int i = 0; i < length; i++) {
@@ -82,57 +91,62 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.println(topic);
     Serial.print("Mensaje: ");
     Serial.println(message);
-    messsage_from_other = true;
+    messageFromOther = true;
 }
 
-
+// Manejar entrada táctil
 void handleTouchInput() {
     int touchValue = touchRead(touchPin);
-    
+
     if (touchValue < touchThreshold) {
         if (!isTouching) {
-
+            // Primera detección de toque
             isTouching = true;
             touchStartTime = millis();
             toggleLED();
-            messsage_from_other = false;
-
-        } else if (!longPressDetected && millis() - touchStartTime >= 1000 && !isOfflineMode) {
+            messageFromOther = false;
+        } 
+        else if (!longPressDetected && millis() - touchStartTime >= 1000 && !isOfflineMode) {
+            // Pulsación larga (>= 1 s) y con WiFi activo → publicar MQTT
             longPressDetected = true;
             if (mqttClient.connected()) {
-
                 mqttClient.publish(mqttTopicPublish, "hola");
-
+                Serial.println("Mensaje MQTT enviado por pulsación larga");
             }
-            Serial.println("Se detectó una pulsación larga en el sensor táctil");
-        }else if(!longPressDetected && millis() - touchStartTime >= 3000 && isOfflineMode){
-
+        } 
+        else if (!longPressDetected && millis() - touchStartTime >= 3000 && isOfflineMode) {
+            // Pulsación muy larga (>= 3 s) y en offline → abrir portal WiFi
+            longPressDetected = true;
             WiFiManager wifiManager;
             wifiManager.startConfigPortal("OnDemandAP");
-            Serial.println("connected...yeey :)");
+            Serial.println("Portal WiFi on demand abierto");
 
+            // Re-evaluar conexión
+            if (WiFi.isConnected()) {
+                isOfflineMode = false;
+                setupMQTT(); // Si quieres reconectar MQTT
+                Serial.println("Conexión WiFi restablecida, modo online");
+            }
         }
     } else {
+        // Se suelta el touch
         isTouching = false;
         longPressDetected = false;
     }
 }
 
+// Controlar mensajes recibidos MQTT (toggle cada 3 s)
 void handleMQTTMessages() {
     unsigned long currentMillis = millis();
-    if (mqttClient.connected() && currentMillis - previousMillis >= interval && messsage_from_other) {
+    if (mqttClient.connected() && currentMillis - previousMillis >= interval && messageFromOther) {
         previousMillis = currentMillis;
         toggleLED();
     }
 }
 
-void checkWiFiTimeout() {
-    if (!WiFi.isConnected()) {
-        isOfflineMode = true;
-        Serial.println("Tiempo de conexión WiFi agotado. Modo offline activado.");
-    }
-}
-
+// =========================
+// SETUP
+// =========================
 void setup() {
     Serial.begin(115200);
     pinMode(ledPin, OUTPUT);
@@ -147,23 +161,25 @@ void setup() {
         Serial.print(".");
     }
 
-   
     if (WiFi.isConnected()) {
         setupMQTT();
+    } else {
+        isOfflineMode = true;
+        Serial.println("Tiempo de conexión WiFi agotado. Modo offline activado.");
     }
-
-    checkWiFiTimeout();
 }
 
+// =========================
+// LOOP
+// =========================
 void loop() {
-    
     if (WiFi.isConnected()) {
         if (!mqttClient.connected()) {
             reconnectMQTT();
-            }
+        }
         mqttClient.loop();
         handleMQTTMessages();
-        }
+    }
 
     handleTouchInput();
 }
