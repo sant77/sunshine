@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
-#include <SPIFFS.h>
 #include <PubSubClient.h>
 #include "secrets.h"
 
@@ -92,16 +91,26 @@ void handleTouchInput() {
     
     if (touchValue < touchThreshold) {
         if (!isTouching) {
+
             isTouching = true;
             touchStartTime = millis();
             toggleLED();
             messsage_from_other = false;
+
         } else if (!longPressDetected && millis() - touchStartTime >= 1000 && !isOfflineMode) {
             longPressDetected = true;
             if (mqttClient.connected()) {
+
                 mqttClient.publish(mqttTopicPublish, "hola");
+
             }
             Serial.println("Se detectó una pulsación larga en el sensor táctil");
+        }else if(!longPressDetected && millis() - touchStartTime >= 3000 && isOfflineMode){
+
+            WiFiManager wifiManager;
+            wifiManager.startConfigPortal("OnDemandAP");
+            Serial.println("connected...yeey :)");
+
         }
     } else {
         isTouching = false;
@@ -129,9 +138,16 @@ void setup() {
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, ledState);
 
-   
+    WiFi.mode(WIFI_STA);
+    WiFi.begin();
+    
+    unsigned long startAttemptTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 5000) {
+        delay(500);
+        Serial.print(".");
+    }
 
-    setupWiFi();
+   
     if (WiFi.isConnected()) {
         setupMQTT();
     }
@@ -141,23 +157,13 @@ void setup() {
 
 void loop() {
     
-    
-    if (isOfflineMode) {
-        int touchValue = touchRead(touchPin);
-        if (touchValue < touchThreshold && !isTouching) {
-            isTouching = true;
-            toggleLED();
-        } else if (touchValue >= touchThreshold) {
-            isTouching = false;
-        }
-    } else {
-        if (WiFi.isConnected()) {
-            if (!mqttClient.connected()) {
-                reconnectMQTT();
+    if (WiFi.isConnected()) {
+        if (!mqttClient.connected()) {
+            reconnectMQTT();
             }
-            mqttClient.loop();
-            handleMQTTMessages();
+        mqttClient.loop();
+        handleMQTTMessages();
         }
-        handleTouchInput();
-    }
+
+    handleTouchInput();
 }
