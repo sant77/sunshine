@@ -33,7 +33,7 @@ const long interval = 3000; // Intervalo para togglear LED por MQTT
 // Clientes
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
-
+WiFiManager wifiManager;
 // =========================
 // FUNCIONES AUXILIARES
 // =========================
@@ -117,7 +117,6 @@ void handleTouchInput() {
         else if (!longPressDetected && millis() - touchStartTime >= 3000 && isOfflineMode) {
             // Pulsación muy larga (>= 3 s) y en offline → abrir portal WiFi
             longPressDetected = true;
-            WiFiManager wifiManager;
             wifiManager.startConfigPortal("OnDemandAP");
             Serial.println("Portal WiFi on demand abierto");
 
@@ -148,6 +147,7 @@ void handleMQTTMessages() {
 // SETUP
 // =========================
 void setup() {
+    //wifiManager.resetSettings();
     Serial.begin(115200);
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, ledState);
