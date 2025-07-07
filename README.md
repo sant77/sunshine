@@ -18,7 +18,7 @@ Además, permite enviar y recibir mensajes MQTT y ofrece un **modo offline** con
 
 ### Diagrama de flujo
 
-![Alt text](docs/Inteligent lamp.jpg)
+![Alt text](docs/Inteligent_lamp.jpg)
 
 ### Inicio normal
 
