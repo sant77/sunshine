@@ -16,7 +16,10 @@ const char* mqttUser = MQTT_USER;
 // Pines
 const int ledPin = 18;
 const int touchPin = 32;
-const int touchThreshold = 40;
+const int touchThreshold = 60;
+
+// Number of attemps
+int attempts = 0;
 
 // Estados
 bool ledState = false;
@@ -53,7 +56,7 @@ void setupMQTT() {
 }
 
 void reconnectMQTT() {
-    int attempts = 0;
+   
     while (!mqttClient.connected() && attempts < 7) {
         Serial.println("Intentando conectar al broker MQTT...");
         if (mqttClient.connect("ESP32Client", mqttUser, "")) {
@@ -82,11 +85,14 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 
 void handleTouchInput() {
+    static unsigned long lastTouchChange = 0;
+    const int debounceDelay = 50; // 50 ms de debounce
     int touchValue = touchRead(touchPin);
 
     if (touchValue < touchThreshold) {
-        if (!isTouching) {
+        if (!isTouching && millis() - lastTouchChange > debounceDelay) {
             isTouching = true;
+            lastTouchChange = millis();
             touchStartTime = millis();
             toggleLED();
             messageFromOther = false;
@@ -100,8 +106,7 @@ void handleTouchInput() {
         } 
         else if (!longPressDetected && millis() - touchStartTime >= 3000 && isOfflineMode) {
             longPressDetected = true;
-
-            // Parámetros personalizados para tópicos
+                 // Parámetros personalizados para tópicos
             WiFiManagerParameter custom_topic_pub("pub", "MQTT Topic Publish", mqttTopicPublish.c_str(), 64);
             WiFiManagerParameter custom_topic_sub("sub", "MQTT Topic Subscribe", mqttTopicSubscribe.c_str(), 64);
 
@@ -128,8 +133,11 @@ void handleTouchInput() {
             }
         }
     } else {
-        isTouching = false;
-        longPressDetected = false;
+        if (isTouching && millis() - lastTouchChange > debounceDelay) {
+            isTouching = false;
+            longPressDetected = false;
+            lastTouchChange = millis();
+        }
     }
 }
 
@@ -159,7 +167,7 @@ void setup() {
         Serial.print(".");
     }
 
-    if (WiFi.isConnected()) {
+    if (WiFi.status() == WL_CONNECTED) {
         setupMQTT();
     } else {
         isOfflineMode = true;
@@ -171,7 +179,7 @@ void setup() {
 // LOOP
 // =========================
 void loop() {
-    if (WiFi.isConnected()) {
+    if (!isOfflineMode) {
         if (!mqttClient.connected()) {
             reconnectMQTT();
         }
